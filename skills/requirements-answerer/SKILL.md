@@ -5,7 +5,7 @@ license: MIT
 compatibility: 需要需求文档、设计文档和澄清问题清单。
 metadata:
   author: sangang
-  version: "2.0"
+  version: "2.1"
 ---
 
 # 需求问题解答器 —— 基于文档回答澄清问题
@@ -77,7 +77,7 @@ for question in questions:
         # 暂停等待：使用 clarify 工具向用户提问
 ```
 
-**关键原则（v2.0）**：
+**关键原则（v2.1）**：
 
 - 文档有线索时**可以**推断，但必须标注推断依据，且**不计入完成度**
 - 仅当文档完全无信息时才标记"需用户确认"
@@ -88,20 +88,75 @@ for question in questions:
 
 将答案按原问题的模块和优先级组织输出。
 
-### Step 5：计算统计并写入
+### Step 5：写入前强制自检（v2.1 防作弊）
+
+**在 write_file 之前，必须运行以下自检。任一检查失败 → 立即修正 answer 分类，不得继续写入。**
 
 ```python
-from hermes_tools import write_file
+import re
 
-# 统计
-total = len(所有问题)
-explicit = len(文档明确回答)
-inferred = len(文档推断回答)
-need_user = len(需用户确认)
-completion = explicit / total * 100  # v2.0：推断不计入
+# 自检 A：确定性: 中 必须对应 分类: 文档推断回答（v2.1 核心防作弊规则）
+# 这是最常见的绕过方式 —— 把推断答案标记为"文档明确回答"来抬高完成度
+certainty_medium = re.findall(r"\*\*确定性\*\*:\s*中", report_content)
+category_inferred = re.findall(r"\*\*分类\*\*:\s*文档推断回答", report_content)
+if len(certainty_medium) != len(category_inferred):
+    # FATAL：确定性:中的条目标记了错误的分类
+    # 找出具体违规条目并修正
+    raise AssertionError(
+        f"分类作弊检测：确定性:中 {len(certainty_medium)}条 ≠ 分类:文档推断回答 {len(category_inferred)}条。"
+        f"请逐条修正：所有确定性:中的答案必须对应 分类:文档推断回答。"
+    )
+
+# 自检 B：确定性: 高 必须对应 分类: 文档明确回答
+certainty_high = re.findall(r"\*\*确定性\*\*:\s*高", report_content)
+category_explicit = re.findall(r"\*\*分类\*\*:\s*文档明确回答", report_content)
+if len(category_explicit) > len(certainty_high):
+    raise AssertionError(
+        f"分类错误：分类:文档明确回答 {len(category_explicit)}条 > 确定性:高 {len(certainty_high)}条。"
+        f"有 {len(category_explicit) - len(certainty_high)} 条文档明确回答缺少确定性:高标记。"
+    )
+
+# 自检 C：完成度计算与实际一致
+total_q = len(re.findall(r"\*\*问题\*\*:", report_content))
+completion_actual = len(category_explicit) / total_q * 100 if total_q > 0 else 0
+# 报告中声称的完成度
+reported_completion_match = re.search(r"完成度[^%]*\*\*(\d+(?:\.\d+)?)%\*\*", report_content)
+if reported_completion_match:
+    reported = float(reported_completion_match.group(1))
+    if abs(completion_actual - reported) > 0.5:
+        raise AssertionError(
+            f"完成度计算不一致：实际 {completion_actual:.1f}%，报告 {reported:.1f}%"
+        )
+
+# 自检 D：每条推断回答都标注了推断依据
+for match in re.finditer(r"\*\*分类\*\*:\s*文档推断回答", report_content):
+    context_after = report_content[match.start():match.start()+300]
+    if not re.search(r"(推断依据|推断逻辑|推断:", context_after):
+        raise AssertionError(
+            f"文档推断回答缺少推断依据说明（位置 {match.start()}）"
+        )
+```
+
+**自检全部通过后才执行 write_file。**
+
+### Step 6：写入并回读验证
+
+```python
+from hermes_tools import write_file, read_file
 
 write_file("{OUTPUT_DIR}/01-answerer-解答报告.md", report_content)
+
+# 强制回读验证（协议 2）
+written = read_file("{OUTPUT_DIR}/01-answerer-解答报告.md")["content"]
+assert len(written) > 0, "FATAL: 写入的文件为空"
+assert "**完成度**" in written, "FATAL: 缺少完成度统计"
+assert "文档明确回答" in written, "FATAL: 缺少分类统计"
 ```
+
+### Step 7：计算统计
+
+```python
+# 统计（在自检通过后重新确认）
 
 ## 输出格式
 

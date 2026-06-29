@@ -5,7 +5,7 @@ license: MIT
 compatibility: 需要需求文档和问答记录。
 metadata:
   author: sangang
-  version: "2.0"
+  version: "2.1"
 ---
 
 # 需求问答审核器 —— 门控判定与完成度计算
@@ -34,9 +34,9 @@ answer_report = read_file("{OUTPUT_DIR}/01-answerer-解答报告.md")["content"]
 question_list = read_file("{OUTPUT_DIR}/01-clarifier-问题清单.md")["content"]
 ```
 
-### Step 2：解析解答报告
+### Step 2：解析解答报告并交叉验证分类
 
-从解答报告中提取关键数据：
+从解答报告中提取关键数据，**同时运行分类一致性交叉验证**：
 
 ```python
 import re
@@ -47,11 +47,46 @@ inferred = len(re.findall(r"分类.*文档推断回答", answer_report))
 need_user = len(re.findall(r"分类.*需用户确认", answer_report))
 total = explicit + inferred + need_user
 
-# 计算完成度（v2.0：仅明确回答计入）
+# === v2.1 强制交叉验证 A：确定性: 中 ≠ 文档明确回答 ===
+# 这是最常见的作弊方式 —— answerer 把推断标记为明确回答
+medium_certainty = re.findall(r"\*\*确定性\*\*:\s*中", answer_report)
+explicit_category = re.findall(r"\*\*分类\*\*:\s*文档明确回答", answer_report)
+classification_cheat_count = 0
+if len(medium_certainty) != len(inferred):
+    classification_cheat_count = abs(len(medium_certainty) - len(inferred))
+    # 将这标记为"分类作弊"而非静默接收
+
+# === v2.1 强制交叉验证 B：每条文档明确回答必须有非空引用 ===
+explicit_without_ref = 0
+for match in re.finditer(r"\*\*分类\*\*:\s*文档明确回答", answer_report):
+    context_after = answer_report[match.start():match.start()+500]
+    basis = re.search(r"\*\*依据\*\*:\s*([^\n]+)", context_after)
+    if not basis or not basis.group(1).strip() or basis.group(1).strip() in ("无", "无依据", "暂无"):
+        explicit_without_ref += 1
+
+# 计算真实完成度（仅文档明确回答计入，同 v2.0）
+# 但如果在交叉验证中发现分类作弊，必须将作弊条目降级
 completion = explicit / total * 100 if total > 0 else 0
 
 # 检查问题总数与清单是否一致
 question_expected = len(re.findall(r"\*\*问题\*\*:", question_list))
+```
+
+### Step 2.5：完成度真实性判定
+
+审计报告的完成度必须以 Step 2 的精确计算结果为准，不得使用 answerer 报告中的声明值：
+
+```python
+# 如果发现分类作弊，必须降级作弊条目并重新计算
+if classification_cheat_count > 0:
+    true_explicit = explicit - classification_cheat_count
+    true_completion = true_explicit / total * 100 if total > 0 else 0
+    audit_warnings.append({
+        "type": "分类作弊",
+        "detail": f"发现 {classification_cheat_count} 条确定性:中的条目被错误标记为文档明确回答",
+        "impact": f"真实完成度应为 {true_completion:.1f}%（而非声明的 {completion:.1f}%）",
+        "action": "驳回解答报告，要求 answerer 修正分类后重新提交"
+    })
 ```
 
 ### Step 3：逐条审核质量
@@ -73,13 +108,16 @@ question_expected = len(re.findall(r"\*\*问题\*\*:", question_list))
 4. **推断回答是否过度**：
    - 如果文档中有足够信息可以直接回答，但被标记为"推断"，则标记为分类错误
 
-### Step 4：生成审核报告
+### Step 4：生成审核报告并写入门控令牌
 
 ```python
-from hermes_tools import write_file
+from hermes_tools import write_file, read_file
+import json
 
-# 门控判定
-gate_passed = completion >= 90
+# 门控判定（v2.1：如有分类作弊，使用真实完成度）
+true_explicit = explicit - classification_cheat_count if classification_cheat_count > 0 else explicit
+true_completion = true_explicit / total * 100 if total > 0 else 0
+gate_passed = true_completion >= 90
 rounds = 当前轮次  # 从上下文中获取
 
 if rounds >= 3 and not gate_passed:
@@ -88,6 +126,29 @@ elif gate_passed:
     action = "PASS：进入阶段 2"
 else:
     action = "RETRY：回到 clarifier 生成补充问题"
+
+# === v2.1 写入门控令牌文件（协议 1） ===
+gate_token = {
+    "stage": 1,
+    "passed": gate_passed,
+    "metrics": {
+        "completion_rate": round(true_completion / 100, 2),
+        "total_questions": total,
+        "explicit_answers": true_explicit,
+        "inferred_answers": inferred,
+        "need_user_confirm": need_user,
+        "classification_cheat_detected": classification_cheat_count > 0,
+        "classification_cheat_count": classification_cheat_count,
+        "explicit_without_ref": explicit_without_ref
+    },
+    "timestamp": datetime.now().isoformat()
+}
+write_file("{OUTPUT_DIR}/.gate-1.json", json.dumps(gate_token, ensure_ascii=False, indent=2))
+
+# 强制回读验证
+token_readback = read_file("{OUTPUT_DIR}/.gate-1.json")["content"]
+assert len(token_readback) > 0, "FATAL: 门控令牌写入失败"
+assert '"passed"' in token_readback, "FATAL: 门控令牌缺少 passed 字段"
 ```
 
 ### Step 5：写入审核报告

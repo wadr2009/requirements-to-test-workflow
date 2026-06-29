@@ -5,7 +5,7 @@ license: MIT
 compatibility: 需要需求文档和测试功能点。
 metadata:
   author: sangang
-  version: "2.0"
+  version: "2.1"
 ---
 
 # 测试点评审器 —— 覆盖度与一致性验证
@@ -119,13 +119,33 @@ for tp in test_points:
 | 测试数据可构造 | 测试数据有明确取值或构造方法 |
 | 无外部依赖阻塞 | 不依赖不可控的外部系统（或已标注 Mock 方案） |
 
-### Step 7：生成评审报告并写入
+### Step 7：生成评审报告并写入门控令牌
 
 ```python
-from hermes_tools import write_file
+from hermes_tools import write_file, read_file
+import json
 
 # 门控判定
 gate_passed = coverage_rate >= 95 and len(inconsistencies) == 0
+
+# === v2.1 写入门控令牌文件（协议 1） ===
+gate_token = {
+    "stage": 3,
+    "passed": gate_passed,
+    "metrics": {
+        "coverage": round(coverage_rate / 100, 2),
+        "total_requirement_points": total_req,
+        "covered": covered,
+        "uncovered": uncovered,
+        "inconsistencies": len(inconsistencies)
+    },
+    "timestamp": datetime.now().isoformat()
+}
+write_file("{OUTPUT_DIR}/.gate-3.json", json.dumps(gate_token, ensure_ascii=False, indent=2))
+
+# 强制回读验证
+token_readback = read_file("{OUTPUT_DIR}/.gate-3.json")["content"]
+assert len(token_readback) > 0, "FATAL: 门控令牌写入失败"
 
 write_file("{OUTPUT_DIR}/03-test-feature-reviewer-评审.md", report_content)
 ```

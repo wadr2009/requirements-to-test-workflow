@@ -5,7 +5,7 @@ license: MIT
 compatibility: 需要测试用例和需求文档。
 metadata:
   author: sangang
-  version: "2.0"
+  version: "2.1"
 ---
 
 # 测试用例评审器 —— 最终质量门
@@ -210,9 +210,12 @@ p0_p1_complete = all(
 | 数据具体 | 测试数据有具体取值（非"测试数据"） |
 | 场景明确 | 前置条件描述了具体状态（非"正常状态"） |
 
-### Step 8：门控判定
+### Step 8：门控判定并写入门控令牌
 
 ```python
+from hermes_tools import write_file, read_file
+import json
+
 # 计算四个指标
 coverage = 需求覆盖度  # 目标: 100%
 format_compliance = format_rate  # 目标: ≥ 95%
@@ -223,8 +226,31 @@ gate_passed = (
     coverage == 100 
     and format_compliance >= 95 
     and p0_p1_ok
-    and traceability_ok  # v2.0 新增条件
+    and traceability_ok
 )
+
+# === v2.1 写入门控令牌文件（协议 1） ===
+gate_token = {
+    "stage": 4,
+    "passed": gate_passed,
+    "metrics": {
+        "coverage": coverage / 100,
+        "format_rate": format_compliance / 100,
+        "p0_count": len(p0_cases),
+        "p1_count": len(p1_cases),
+        "p2_count": len(p2_cases),
+        "p0p1_complete": p0_p1_ok,
+        "traceability_ok": traceability_ok,
+        "traceability_issue_count": len(traceability_issues)
+    },
+    "timestamp": datetime.now().isoformat()
+}
+write_file("{OUTPUT_DIR}/.gate-4.json", json.dumps(gate_token, ensure_ascii=False, indent=2))
+
+# 强制回读验证
+token_readback = read_file("{OUTPUT_DIR}/.gate-4.json")["content"]
+assert len(token_readback) > 0, "FATAL: 门控令牌写入失败"
+assert '"passed"' in token_readback, "FATAL: 门控令牌缺少 passed 字段"
 ```
 
 ### Step 8：写入评审报告
