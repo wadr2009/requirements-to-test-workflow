@@ -248,29 +248,10 @@ write_file("{OUTPUT_DIR}/03-test-point-analyzer-测试点.md", report_content)
 
 ## 验证步骤
 
-```python
-from hermes_tools import read_file, search_files
-import re
-
-report = read_file("{OUTPUT_DIR}/03-test-point-analyzer-测试点.md")["content"]
-
-# 1. 验证测试点编号连续
-tp_ids = re.findall(r"TP(\d+)", report)
-# 检查是否有跳号
-
-# 2. 验证每个测试点都有必要字段
-fields = ["优先级", "测试类型", "前置条件", "预期结果"]
-for tp in tp_ids:
-    # 搜索该 TP 上下文，确认字段存在
-    pass
-
-# 3. 验证覆盖率
-# 对比模块拆分报告中的功能点总数
-modules_report = read_file("{OUTPUT_DIR}/02-module-splitter-模块拆分.md")["content"]
-req_count = len(re.findall(r"功能点\d", modules_report))
-tp_coverage = len(set(tp_ids))
-assert tp_coverage >= req_count * 0.95, f"覆盖率不足: {tp_coverage}/{req_count}"
-```
+用 `read_file` 回读测试点报告并检查：
+- 测试点编号连续（无跳号）
+- 每个测试点都有：优先级、测试类型、前置条件、预期结果
+- 覆盖率 ≥ 95%（对比模块拆分报告中的功能点总数）
 
 ## 注意事项
 

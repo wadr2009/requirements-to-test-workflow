@@ -259,18 +259,10 @@ write_file("{OUTPUT_DIR}/03-test-feature-reviewer-评审.md", report_content)
 
 ## 验证步骤
 
-```python
-from hermes_tools import read_file
-
-review = read_file("{OUTPUT_DIR}/03-test-feature-reviewer-评审.md")["content"]
-
-# 1. 门控判定与数据一致
-if "覆盖度" in review and "100%" in review or "9" in review:
-    assert "✅" in review, "高覆盖度但门控未通过"
-
-# 2. 每个不一致项都必须有"建议"
-# 3. 可测试性评分四个维度都有数据
-```
+用 `read_file` 回读评审报告并检查：
+- 门控判定与数据一致（高覆盖度必须有 PASS）
+- 每个不一致项都有"建议"
+- 可测试性评分四个维度都有数据
 
 ## 门控后续
 

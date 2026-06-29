@@ -260,27 +260,11 @@ write_file("{OUTPUT_DIR}/02-module-splitter-模块拆分.md", report_content)
 
 ## 验证步骤
 
-```python
-from hermes_tools import read_file
-
-report = read_file("{OUTPUT_DIR}/02-module-splitter-模块拆分.md")["content"]
-
-# 检查清单：
-# 1. 功能点覆盖率 = 100%（与原始需求对比）
-# 2. 依赖关系图无未标记的循环
-# 3. 每个模块都有风险等级（高/中/低）
-# 4. 至少识别了一个用户角色
-
-checks = [
-    ("覆盖率" in report and "100%" in report, "功能点覆盖率"),
-    ("风险等级" in report, "风险等级标注"),
-    ("用户角色" in report or "角色" in report, "用户角色分析"),
-    ("依赖关系" in report, "依赖关系分析"),
-]
-
-for passed, check_name in checks:
-    assert passed, f"❌ 检查失败: {check_name}"
-```
+用 `read_file` 回读模块拆分报告并检查：
+- 功能点覆盖率 = 100%（与原始需求对比）
+- 依赖关系图无未标记的循环
+- 每个模块都有风险等级（高/中/低）
+- 至少识别了一个用户角色
 
 ## 注意事项
 

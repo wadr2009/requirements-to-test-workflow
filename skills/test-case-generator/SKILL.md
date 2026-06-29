@@ -129,11 +129,7 @@ except:
 ###### {预期结果}
 ```
 
-**层级规则**：
-- 只有一个 `#` 一级标题
-- 当功能分组层级较深时，`###` 用例声明可向后延伸至 `####` 或更深
-- `##### pc：` 必须跟在用例声明之后
-- `######` 预期结果必须直接跟在对应的 `#####` 步骤之后
+> 完整层级规则见 `skills/test-case-format/SKILL.md`，此处不重复。
 
 ### Step 6：生成全链路追溯附录
 
@@ -280,39 +276,12 @@ write_file("{OUTPUT_DIR}/04-test-case-generator-用例.md", xmind_content)
 
 ## 验证步骤
 
-写入后立即自检：
-
-```python
-from hermes_tools import read_file
-import re
-
-content = read_file("{OUTPUT_DIR}/04-test-case-generator-用例.md")["content"]
-
-# 1. 只有一个一级标题
-h1_count = len(re.findall(r"^# [^#]", content, re.MULTILINE))
-assert h1_count == 1, f"一级标题必须唯一，当前: {h1_count}"
-
-# 2. 用例声明格式正确（tc-P0/tc-P1/tc-P2）
-tc_declarations = re.findall(r"tc-P\d：", content)
-assert len(tc_declarations) > 0, "没有找到测试用例声明"
-
-# 3. 每个用例都有 pc 前置条件
-pc_count = len(re.findall(r"##### pc：", content))
-assert pc_count >= len(tc_declarations), \
-    f"前置条件数量({pc_count}) < 用例数量({len(tc_declarations)})"
-
-# 4. 预期结果紧跟步骤（###### )
-result_count = len(re.findall(r"###### ", content))
-assert result_count > 0, "没有找到预期结果"
-
-# 5. 所有测试点都有对应用例（对照测试点报告）
-# 从追溯矩阵中验证
-tp_report = read_file("{OUTPUT_DIR}/03-test-point-analyzer-测试点.md")["content"]
-tp_in_report = set(re.findall(r"TP(\d+)", tp_report))
-tp_in_matrix = set(re.findall(r"TP(\d+)", content))
-uncovered = tp_in_report - tp_in_matrix
-assert len(uncovered) == 0, f"未覆盖的测试点: {uncovered}"
-```
+写入后，用 `read_file` 回读并检查：
+- 只有一个一级标题
+- 有 `tc-P0/P1/P2` 用例声明
+- 每个用例都有 `pc` 前置条件
+- 预期结果数量 ≥ 步骤数量
+- 所有测试点都有对应用例（对照测试点报告）
 
 ## 注意事项
 

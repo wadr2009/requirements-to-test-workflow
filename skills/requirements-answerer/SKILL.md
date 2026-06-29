@@ -228,25 +228,10 @@ clarify(
 
 ## 验证步骤
 
-写入后验证：
-
-```python
-from hermes_tools import read_file
-import re
-
-report = read_file("{OUTPUT_DIR}/01-answerer-解答报告.md")["content"]
-
-# 1. 每个问题都有答案、依据、确定性、分类
-answer_count = len(re.findall(r"\*\*答案\*\*:", report))
-basis_count = len(re.findall(r"\*\*依据\*\*:", report))
-certainty_count = len(re.findall(r"\*\*确定性\*\*:", report))
-category_count = len(re.findall(r"\*\*分类\*\*:", report))
-assert answer_count == basis_count == certainty_count == category_count, \
-    f"字段不完整: 答案{answer_count} 依据{basis_count} 确定性{certainty_count} 分类{category_count}"
-
-# 2. 完成度计算正确
-# 3. 没有"确定性: 中"被错误标记为"文档明确回答"
-```
+写入后，用 `read_file` 回读并检查：
+- 每个问题都有答案、依据、确定性、分类四个字段（数量一致）
+- 完成度计算正确（仅文档明确回答计入）
+- 无"确定性:中"被错误标记为"文档明确回答"
 
 ## 注意事项
 

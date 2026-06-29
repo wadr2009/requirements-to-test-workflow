@@ -150,26 +150,11 @@ write_file("{OUTPUT_DIR}/01-clarifier-问题清单.md", report_content)
 
 ## 验证步骤
 
-写入后，使用 `read_file` 重新读取并检查：
-
-```python
-from hermes_tools import read_file
-
-report = read_file("{OUTPUT_DIR}/01-clarifier-问题清单.md")["content"]
-
-# 验证项：
-# 1. 文件中至少有一个关键问题
-assert "关键问题" in report, "缺少关键问题分类"
-
-# 2. 每个问题都有"问题"和"背景"两个字段
-import re
-questions = re.findall(r"\*\*问题\*\*:", report)
-backgrounds = re.findall(r"\*\*背景\*\*:", report)
-assert len(questions) == len(backgrounds), "问题与背景数量不一致"
-
-# 3. 问题总数与统计一致
-# 4. 至少覆盖了需求文档中所有主要模块
-```
+写入后，用 `read_file` 回读并检查：
+- 至少有一个关键问题分类
+- 每个问题都有"问题"和"背景"字段（数量一致）
+- 问题总数与统计一致
+- 覆盖了需求文档中所有主要模块
 
 ## 注意事项
 

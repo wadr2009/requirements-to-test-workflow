@@ -146,43 +146,9 @@ traceability_chain_ok = len(traceability_issues) == 0
 
 ### Step 5：格式合规性检查
 
-对照 test-case-format 规范逐项检查：
+使用 `test-case-format` 中定义的 `validate_format()` 函数逐项检查（规则 1-8），计算合规率。
 
-```python
-checks = []
-
-# 检查1：一级标题唯一
-h1_count = len(re.findall(r"^# [^#]", test_cases, re.MULTILINE))
-checks.append(("一级标题唯一", h1_count == 1, 
-    f"{'✅' if h1_count == 1 else '❌ 发现{h1_count}个一级标题'}"))
-
-# 检查2：用例声明格式正确
-tc_format_ok = all(
-    re.match(r"tc-P\d：", decl) 
-    for _, decl in test_cases_list
-)
-checks.append(("用例声明格式", tc_format_ok))
-
-# 检查3：每个用例有 pc 前置条件
-pc_count = len(re.findall(r"##### pc：", test_cases))
-checks.append(("前置条件完整", pc_count >= len(test_cases_list),
-    f"{pc_count}/{len(test_cases_list)}"))
-
-# 检查4：每个用例步骤后有预期结果
-steps = len(re.findall(r"^##### (?!pc：)", test_cases, re.MULTILINE))
-results = len(re.findall(r"^###### ", test_cases, re.MULTILINE))
-checks.append(("预期结果完整", results >= steps,
-    f"步骤{steps}个，预期结果{results}个"))
-
-# 检查5：无空步骤
-empty_steps = len(re.findall(r"^#####\s*$", test_cases, re.MULTILINE))
-checks.append(("无空步骤", empty_steps == 0,
-    f"{'✅' if empty_steps == 0 else '❌ 发现{empty_steps}个空步骤'}"))
-
-# 计算格式合规率
-format_pass = sum(1 for _, passed, _ in checks if passed)
-format_rate = format_pass / len(checks) * 100
-```
+> 检查代码见 `skills/test-case-format/SKILL.md` 的"可验证的格式检查规则"章节，此处不重复。
 
 ### Step 5：P0/P1 完整性检查
 
@@ -409,15 +375,10 @@ write_file("{OUTPUT_DIR}/04-test-case-reviewer-评审.md", review_content)
 
 ## 验证步骤
 
-```python
-from hermes_tools import read_file
-
-review = read_file("{OUTPUT_DIR}/04-test-case-reviewer-评审.md")["content"]
-
-# 1. 门控数据自洽
-# 2. 每个格式问题都有修订建议
-# 3. 修订清单与问题清单一一对应
-```
+用 `read_file` 回读评审报告并检查：
+- 门控数据自洽
+- 每个格式问题都有修订建议
+- 修订清单与问题清单一一对应
 
 ## 门控后续
 

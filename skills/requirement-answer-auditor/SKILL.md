@@ -253,21 +253,11 @@ write_file("{OUTPUT_DIR}/01-auditor-审核报告.md", report_content)
 
 ## 验证步骤
 
-```python
-from hermes_tools import read_file
-
-audit = read_file("{OUTPUT_DIR}/01-auditor-审核报告.md")["content"]
-
-# 1. 完成度计算正确
-# 手动验证：explicit/total 是否匹配报告中的百分比
-
-# 2. 门控判定与完成度一致
-if "完成度: 100" in audit or "完成度: 9" in audit:  # 90%+
-    assert "PASS" in audit or "✅" in audit, "高完成度但未通过门控"
-
-# 3. 分类总数与问题总数一致
-# 4. 如果有分类错误，必须列出
-```
+用 `read_file` 回读审核报告并检查：
+- 完成度计算正确（explicit/total 匹配报告中的百分比）
+- 门控判定与完成度一致（高完成度必须有 PASS）
+- 分类总数与问题总数一致
+- 如有分类错误，必须列出
 
 ## 回环触发
 
